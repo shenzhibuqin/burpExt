@@ -11,13 +11,19 @@ import burp.api.montoya.ui.editor.HttpResponseEditor;
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 
 public class SenderForm {
 
-    private MontoyaApi api;
     public HttpRequestEditor requestViewer;
     public HttpResponseEditor responseViewer;
     public JPanel panel1;
+    private final MontoyaApi api;
     private JTextField textFieldUrl;
     private JCheckBox GETCheckBox;
     private JCheckBox POSTCheckBox;
@@ -26,6 +32,10 @@ public class SenderForm {
     private JButton sendButton;
     private JTextArea textAreaHeaders;
     private JTextArea textAreaBody;
+    private JButton loadUrlsButton;
+    private JTextArea textAreaHosts;
+    private JTextField textPath;
+    private JCheckBox pathCheckBox;
 
     public SenderForm(HttpRequestEditor requestViewer, HttpResponseEditor responseViewer, MontoyaApi api) {
         this.requestViewer = requestViewer;
@@ -47,21 +57,27 @@ public class SenderForm {
             } else {
                 method = textFieldMethod.getText();
             }
-            if (textFieldUrl.getText().equals("")) {
+            if (textAreaHosts.getText().equals("")) {
                 logging.logToError("url is empty");
                 return;
             }
+            logging.logToOutput("method = " + method);
 
-            String url = textFieldUrl.getText();
+            String url = textAreaHosts.getText().strip();
             int index = url.indexOf("/", 8);
             String serviceAddress = index == -1 ? url : url.substring(0, index);
-            logging.logToOutput("service = " + serviceAddress);
             HttpService service = HttpService.httpService(serviceAddress);
+            logging.logToOutput("service = " + serviceAddress);
 
             String Host = serviceAddress.replace("https://", "").replace("http://", "");
             logging.logToOutput("Host = " + Host);
 
-            String path = index == -1 ? "/" : url.substring(index);
+            String path;
+            if (pathCheckBox.isSelected() && !Objects.equals(pathCheckBox.getText().strip(), "")) {
+                path = index == -1 ? textPath.getText().strip() : url.substring(index) + textPath.getText().strip();
+            } else {
+                path = index == -1 ? "/" : url.substring(index);
+            }
             logging.logToOutput("path = " + path);
 
             HttpRequest req = HttpRequest.httpRequest()
@@ -113,6 +129,32 @@ public class SenderForm {
         otherCheckBox.addActionListener(e -> {
             GETCheckBox.setSelected(false);
             POSTCheckBox.setSelected(false);
+        });
+        loadUrlsButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                final JFileChooser fc = new JFileChooser();
+                fc.setFileSelectionMode(JFileChooser.FILES_ONLY);
+                // JFileChooser.FILES_ONLY
+                // JFileChooser.DIRECTORIES_ONLY
+                int returnVal = fc.showOpenDialog(panel1);
+                if (returnVal == JFileChooser.APPROVE_OPTION) {
+                    File file = fc.getSelectedFile();
+                    try {
+                        InputStreamReader read = new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8);
+                        BufferedReader bufferedReader = new BufferedReader(read);
+                        StringBuilder urls = new StringBuilder();
+                        String lineText;
+                        while ((lineText = bufferedReader.readLine()) != null) {
+                            urls.append(lineText + "\n");
+                        }
+                        read.close();
+                        textAreaHosts.setText(urls.toString().strip());
+                    } catch (Exception exception) {
+                    }
+                }
+
+            }
         });
     }
 
